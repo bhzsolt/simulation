@@ -1,5 +1,5 @@
-#ifndef SETUP
-#define SETUP
+#ifndef CONFIG
+#define CONFIG
 
 #include <inttypes.h>
 
@@ -15,6 +15,7 @@ struct config {
 	double r_0_2;					/* 16.0 */
 	double r_min;					/* 0.2 */
 	double dt;						/* 0.001 */
+	double temperature;				/* 0.0 */
 	uint_fast16_t n;				/* 1000 */
 };
 
@@ -27,9 +28,15 @@ struct time {
 struct arguments {
 	struct config config;
 	struct time time;
-	uint_fast8_t help;
+	const char *movie_filename;		/* "particles.mvi" */
+	const char *timer_filename;		/* "elapsed.times */
+	double specific_volume;			/* 4.5 */
+	uint_fast8_t no_messages;		/* 0 */
+	uint_fast8_t help;				/* 0 */
+	uint_fast8_t error;				/* 0 */
 };
 
 struct arguments parse_args(int, char * const []);
+void check_system_density(struct arguments *);
 
-#endif /* setup.h */
+#endif /* config.h */
