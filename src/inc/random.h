@@ -1,5 +1,5 @@
-#ifndef RANDOM
-#define RANDOM
+#ifndef __RANDOM_H__
+#define __RANDOM_H__
 
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>

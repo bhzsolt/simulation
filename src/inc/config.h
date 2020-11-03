@@ -1,5 +1,5 @@
-#ifndef CONFIG
-#define CONFIG
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
 #include <inttypes.h>
 
@@ -38,5 +38,6 @@ struct arguments {
 
 struct arguments parse_args(int, char * const []);
 void check_system_density(struct arguments *);
+void check_filenames(struct arguments *);
 
 #endif /* config.h */

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <math.h>
+#include <string.h>
 
 #include <config.h>
 
@@ -131,5 +132,28 @@ void check_system_density(struct arguments *arguments)
 			arguments->config.box.SX = arguments->config.box.SY = sqrt(arguments->specific_volume * arguments->config.n);
 			arguments->config.box.sx = arguments->config.box.sy = arguments->config.box.SX / 2;
 		}
+	}
+}
+
+void check_filenames(struct arguments *arguments)
+{
+	if (strrchr(arguments->movie_filename, '.') == NULL) {
+		fprintf(stderr, "Error: movie filetype should be .mvi\n");
+		fprintf(stderr, "using default value\n");
+		arguments->movie_filename = "particles.mvi";
+	} else if (strcmp(".mvi", strrchr(arguments->movie_filename, '.'))) {
+		fprintf(stderr, "Error: movie filetype should be .mvi\n");
+		fprintf(stderr, "using default value\n");
+		arguments->movie_filename = "particles.mvi";
+	}
+
+	if (strrchr(arguments->timer_filename, '.') == NULL) {
+		fprintf(stderr, "Error: timer filetype should be .times\n");
+		fprintf(stderr, "using default value\n");
+		arguments->timer_filename = "elapsed.times";
+	} else if (strcmp(".times", strrchr(arguments->timer_filename, '.'))) {
+		fprintf(stderr, "Error: timer filetype should be .times\n");
+		fprintf(stderr, "using default value\n");
+		arguments->timer_filename = "elapsed.times";
 	}
 }

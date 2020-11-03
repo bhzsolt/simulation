@@ -1,13 +1,6 @@
-#ifndef PARTICLE
-#define PARTICLE
+#ifndef __PARTICLE_H__
+#define __PARTICLE_H__
 
-#define RED		1
-#define BLUE	2
-#define GREEN	3
-#define GREY0	4
-#define GREY1	5
-
-#ifndef PARTICLE_COLORS_ONLY
 #include <inttypes.h>
 #include <config.h>
 
@@ -31,6 +24,5 @@ int particles_calculate_pairwise_forces(struct particle *, struct config *);
 void particles_move(struct particle *, struct config *);
 void particles_print_to_file(struct particle *, struct config *, uint_fast16_t, FILE *);
 
-#endif /* particle structure */
 #endif /* particle.h */
 

@@ -27,6 +27,7 @@ int main(int argc, char * const argv[])
 	}
 
 	check_system_density(&arguments);
+	check_filenames(&arguments);
 	
 	init_rng();
 	flags |= RALL;

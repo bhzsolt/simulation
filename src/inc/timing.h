@@ -1,5 +1,5 @@
-#ifndef TIMING
-#define TIMING
+#ifndef __TIMING_H__
+#define __TIMING_H__
 
 /*
 #define CLOCK_MONOTONIC 0

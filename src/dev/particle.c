@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <particle.h>
+#include <colors.h>
 #include <random.h>
 
 static double distance_folded_PBC(double, double, double, double, struct config *);
