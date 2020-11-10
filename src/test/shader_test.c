@@ -25,7 +25,7 @@ int main(int argc, char * const argv[])
 		n = sizeof(jtable)/sizeof(test_function);
 		for (i = 0; i < n; ++i) {	
 			if (jtable[i](argc - 2, argv + 2) != EXIT_SUCCESS) {
-				printf("errors in test %d\n", i + 1);
+				printf("errors in test %d\n", i);
 				retval = EXIT_FAILURE;
 			}
 		}
@@ -34,7 +34,7 @@ int main(int argc, char * const argv[])
 		if (to_run < 1) exit(EXIT_FAILURE);
 		i = to_run - 1;
 		if (jtable[i](argc - 2, argv + 2) != EXIT_SUCCESS) {
-			printf("errors in test %d\n", i + 1);
+			printf("errors in test %d\n", i);
 			retval = EXIT_FAILURE;
 		}
 		break;

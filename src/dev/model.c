@@ -21,6 +21,7 @@ struct uniform {
 	uniform_type type;
 	GLsizei count;
 	GLboolean transpose;
+	void *data;
 };
 
 static struct uniform *init_uniforms(GLuint, size_t, struct uniform_specs *);
@@ -155,6 +156,7 @@ int draw_model(struct model *model)
 #endif
 	}
 	glUseProgram(model->shader_program);
+	set_uniform("colors", NULL, model);
 	CHECK_GL_ERROR("use shader program");
 	glBindVertexArray(model->vao);
 	//printf("%s vao: %d\n", model->name, model->vao);
@@ -186,7 +188,11 @@ int set_uniform(const char *uni_name, void *data, struct model *model)
 		if (!strcmp(model->uniforms[i].name, uni_name)) {
 			found = 1;
 			glUseProgram(model->shader_program);
-			gl_uniform_wrapper(model->uniforms + i, data);
+			if (data) {
+				gl_uniform_wrapper(model->uniforms + i, data);
+			} else {
+				gl_uniform_wrapper(model->uniforms + i, model->uniforms[i].data);
+			}
 		} else {
 			++i;
 		}
@@ -294,6 +300,7 @@ static struct uniform *init_uniforms(GLuint program, size_t n, struct uniform_sp
 		uniforms[i].type = specs[i].type;
 		uniforms[i].count = specs[i].count;
 		uniforms[i].transpose = specs[i].transpose;
+		uniforms[i].data = specs[i].data;
 		uniforms[i].id = glGetUniformLocation(program, specs[i].name);
 		CHECK_GL_ERROR("error getting location");
 
