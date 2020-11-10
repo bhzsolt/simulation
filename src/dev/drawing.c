@@ -107,7 +107,7 @@ int main(int argc, char * const argv[])
 	GLfloat *smat = create_scale_matrix(0.8, data.wx, data.wy);
 	float *colors = create_colors(5);
 
-	char * const particle_shaders[] = {"particle.vert", "particle.frag", "particle.geom"};
+	char * const particle_shaders[] = {"shaders/particle.vert", "shaders/particle.frag", "shaders/particle.geom"};
 	struct model_specs particles = {
 		.name	= "particles",
 		.data	= particle_vertices,
@@ -146,7 +146,7 @@ int main(int argc, char * const argv[])
 	particles.uniforms = particle_uniforms;
 	
 	float *smat_2 = create_scale_matrix(0.9, data.wx, data.wy);
-	char * const frame_shaders[] = {"frame.vert", "frame.frag", "frame.geom"};
+	char * const frame_shaders[] = {"shaders/frame.vert", "shaders/frame.frag", "shaders/frame.geom"};
 	struct model_specs frame = {
 		.name	= "frame",
 		.data	= (void *)frame_vertices,

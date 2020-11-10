@@ -1,3 +1,5 @@
+dir		:= $(realpath ./)
+
 source	:= src
 target	:= build
 
@@ -94,6 +96,8 @@ $(target) :
 $(target_dirs) : | $(target)
 	mkdir $@
 
+$(bin)/shaders : | $(bin)
+	ln -s $(dir)/shaders $(dir)/$(bin)/shaders
 
 
 clean :
