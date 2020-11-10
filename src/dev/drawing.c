@@ -7,7 +7,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <shaders.h>
+#include <model.h>
 #include <colors.h>
 
 struct drawing_data {
@@ -29,7 +29,8 @@ struct drawing_data {
 
 inline size_t apd_sub_size(struct drawing_data *data)
 {
-	return (data->attrib_pointer_data.coord_n + data->attrib_pointer_data.color_n) * data->n_points;
+	return (data->attrib_pointer_data.coord_n + data->attrib_pointer_data.color_n) 
+		* data->n_points;
 }
 
 inline size_t apd_size(struct drawing_data *data)
@@ -37,40 +38,48 @@ inline size_t apd_size(struct drawing_data *data)
 	return data->attrib_pointer_data.type_size * apd_sub_size(data);
 }
 
-struct render_args {
-	int n_points;
-	int index;
+struct models {
+	struct model *particles;
+	struct model *frame;
 };
 
 GLFWwindow *create_window(int, int, char);
+
 void error_callback(int, const char *);
 void key_pressed_callback(GLFWwindow *, int, int, int, int);
 void framebuffer_size_callback(GLFWwindow *, int, int);
 static void set_callbacks(GLFWwindow *);
+
 static void glfwMainLoop(GLFWwindow *, void (*)(void *), void *);
-int create_opengl_objects(GLuint *, GLuint *, int, void *);
-int handling_uniforms(GLuint, float, int, int, int);
-int handling_attribute_pointers(GLuint, struct attrib_pointer_data *);
 
 static GLfloat *create_rotation_matrix(int);
-static GLfloat *create_scale_matrix(int, int);
+static GLfloat *create_scale_matrix(float, int, int);
+
+void GLAPIENTRY gl_error_callback(GLenum, GLenum, GLuint, GLenum, GLsizei, const GLchar *, const void *);
 
 void render(void *);
 
-int drawing(struct drawing_data *, int, char * const []);
+int drawing(struct drawing_data *, struct model_specs *, struct model_specs *);
 
 int main(int argc, char * const argv[])
 {
 	static GLfloat tmp[] = {
-		-0.5f, -0.5f, 1.f,
-		0.5f, -0.5f, 2.f,
-		0.5f, 0.5f, 3.f,
-		-0.5f, 0.5f, 4.f,
-		0.f, 0.f, 5.f
+		-0.5f, -0.5f, BLUE,
+		0.5f, -0.5f, RED,
+		0.5f, 0.5f, GREEN,
+		-0.5f, 0.5f, GREY0,
+		0.f, 0.f, GREY1
 	};
+	static GLfloat tmp2[] = { 0.0f, 0.0f };
+	GLfloat *frame_vertices = calloc(2, sizeof *frame_vertices);
+	frame_vertices = memcpy(frame_vertices, tmp2, sizeof *frame_vertices * 2);
+	if (!frame_vertices) {
+		perror("initializing frame vertices\n");
+		exit(EXIT_FAILURE);
+	}
 	static struct drawing_data data = {
 		.attrib_pointer_data = {
-			.type_size = sizeof(*tmp),
+			.type_size = sizeof *tmp,
 			.coord_n = 2,
 			.color_n = 1
 		},
@@ -80,20 +89,110 @@ int main(int argc, char * const argv[])
 		.n_segments = 36,
 		.n_points = 5
 	};
-	GLfloat *circle_vertices = calloc(data.attrib_pointer_data.type_size, apd_sub_size(&data));
-	circle_vertices = memcpy(circle_vertices, tmp, apd_size(&data));
-	if (!circle_vertices) {
-		perror("initializing vertices\n");
+	GLfloat *particle_vertices = calloc(apd_sub_size(&data), sizeof *particle_vertices);
+	particle_vertices = memcpy(particle_vertices, tmp, apd_size(&data));
+	if (!particle_vertices) {
+		perror("initializing particle vertices\n");
 		exit(EXIT_FAILURE);
 	}
-	data.particle_data_pointer = (void **)&circle_vertices;
 	data.fullscreen = atoi(argv[1]);
-	int retval = drawing(&data, argc - 2, argv + 2);
-	free(circle_vertices);
+
+	for (int i = 0; i < data.n_points; ++i) {
+		printf("[%.2f, %.2f] -> %.0f\n", particle_vertices[3*i],
+				particle_vertices[3 * i + 1],
+				particle_vertices[3 * i + 2]);
+	}
+
+	GLfloat *rmat = create_rotation_matrix(data.n_segments);
+	GLfloat *smat = create_scale_matrix(0.8, data.wx, data.wy);
+	float *colors = create_colors(5);
+
+	char * const particle_shaders[] = {"particle.vert", "particle.frag", "particle.geom"};
+	struct model_specs particles = {
+		.name	= "particles",
+		.data	= particle_vertices,
+		.size	= sizeof(GLfloat) * 15,
+		.n_attribute = 2,
+		.n_uniform	= 5,
+		.shader_source = particle_shaders,
+		.n_shader	= 3,
+		.n_points	= 5,
+		.usage		= GL_STREAM_DRAW,
+		.mode		= GL_POINTS
+	};
+	struct attribute *particle_attributes = calloc(particles.n_attribute, sizeof *particle_attributes);
+	struct uniform_specs *particle_uniforms = calloc(particles.n_uniform, sizeof *particle_uniforms);
+
+	add_attribute("position", 
+				  2,  
+				  GL_FLOAT, 
+				  sizeof(GLfloat) * 3, 
+				  (const void *) 0,
+				  particle_attributes);
+	add_attribute("color", 
+				  1,
+				  GL_FLOAT, 
+				  sizeof(GLfloat) * 3,
+				  (const void *)(2 * sizeof(GLfloat)),
+				  particle_attributes + 1);
+	
+	add_float_uniform("radius", &(data.radius), particle_uniforms);
+	add_int_uniform("n_segments", &(data.n_segments), particle_uniforms + 1);
+	add_matrix_uniform("rotation_matrix", rmat, particle_uniforms + 2);
+	add_matrix_uniform("scale_matrix", smat, particle_uniforms + 3);
+	add_vect3_uniform("colors", colors, 5, particle_uniforms + 4);
+
+	particles.attributes = particle_attributes;
+	particles.uniforms = particle_uniforms;
+	
+	float *smat_2 = create_scale_matrix(0.9, data.wx, data.wy);
+	char * const frame_shaders[] = {"frame.vert", "frame.frag", "frame.geom"};
+	struct model_specs frame = {
+		.name	= "frame",
+		.data	= (void *)frame_vertices,
+		.size	= sizeof *frame_vertices * 2,
+		.n_attribute = 1,
+		.n_uniform	= 1,
+		.shader_source = frame_shaders,
+		.n_shader	= 3,
+		.n_points	= 1,
+		.usage		= GL_STATIC_DRAW,
+		.mode		= GL_POINTS
+	};
+
+	struct attribute frame_attribute = {
+		.name		= "position",
+		.pointer	= (void *) 0,
+		.size		= 2,
+		.type		= GL_FLOAT,
+		.stride		= 0,
+		.normalized	= GL_FALSE
+	};
+	struct uniform_specs frame_uniform = {
+		.name		= "scale_matrix",
+		.data		= smat_2,
+		.type		= U_M4FV,
+		.count		= 1,
+		.transpose	= GL_TRUE
+	};
+
+	frame.attributes = &frame_attribute;
+	frame.uniforms = &frame_uniform;
+	
+	int retval = drawing(&data, &particles, &frame);
+	//printf("returned");
+
+	free(smat_2);
+	free(colors);
+	free(smat);
+	free(rmat);
+	free(particle_vertices);
+	free(frame_vertices);
 	exit(retval);
+
 }
 
-int drawing(struct drawing_data *data, int n_shader, char * const shader_paths[])
+int drawing(struct drawing_data *data, struct model_specs *particles_s, struct model_specs *frame_s)
 {
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) return EXIT_FAILURE;
@@ -108,40 +207,31 @@ int drawing(struct drawing_data *data, int n_shader, char * const shader_paths[]
 
 	glewExperimental = GL_TRUE;
 	glewInit();
-
-	GLuint vao, vbo; 
-	if (create_opengl_objects(&vao, &vbo, apd_size(data), data->particle_data_pointer[0])) return EXIT_FAILURE;
-
-	GLuint program = create_shader_program(n_shader, shader_paths);
-	if (!program) {
-		perror("create shader program");
-		return EXIT_FAILURE;
-	}
-	glUseProgram(program);
-
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
-	glfwSetWindowUserPointer(window, &program);
-
-	if (handling_attribute_pointers(program, &(data->attrib_pointer_data))) return EXIT_FAILURE;
-	if (handling_uniforms(program, data->radius, data->n_segments, width, height)) return EXIT_FAILURE;
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(gl_error_callback, 0);
+	
+	struct model *particles = create_model(particles_s);
+	struct model *frame;// = create_model(frame_s);
 
 	glClearColor(1.f, 1.f, 1.f, 0.f);
-
-	struct render_args render_args = {
-		.n_points = data->n_points,
-		.index = 0
+	//glLineWidth(1.5);
+	
+	struct models models = {
+		.particles = particles,
+		.frame = frame
 	};
-	glfwMainLoop(window, render, &render_args);
 
-	glDeleteProgram(program);
-	glDeleteBuffers(1, &vbo);
-	glDeleteVertexArrays(1, &vao);
+	glfwSetWindowUserPointer(window, &models);
 
+	glfwMainLoop(window, render, &models);
+
+	cleanup_model(particles);
+	//cleanup_model(frame);
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	return EXIT_SUCCESS;
 }
+
 
 GLFWwindow *create_window(int width, int height, char fullscreen)
 {
@@ -166,6 +256,7 @@ GLFWwindow *create_window(int width, int height, char fullscreen)
 	return window;
 }
 
+
 void error_callback(int error, const char *description)
 {
 	fprintf(stderr, "[ERROR]: %s\n", description);
@@ -183,23 +274,15 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
 	glViewport(0, 0, width, height);
 
-	if (width != height) {
-		GLuint *program = glfwGetWindowUserPointer(window);
-		GLint uni_scale = glGetUniformLocation(*program, "scale_matrix");
-		if (GL_NO_ERROR != glGetError()) {
-			fprintf(stderr, "[ERROR]: framebuffer size callback: getting scale matrix uniform\n");
-		}
+	struct models *models = glfwGetWindowUserPointer(window);
+	//GLfloat *smat_f = create_scale_matrix(0.9, width, height);
+	GLfloat *smat_p = create_scale_matrix(0.8, width, height);
 
-		GLfloat *scale = create_scale_matrix(width, height);
-		if (!scale) {
-			perror("framebuffer size callback: create scale matrix");
-		}
-		glUniformMatrix4fv(uni_scale, 1, GL_TRUE, scale);
-		if (GL_NO_ERROR != glGetError()) {
-			fprintf(stderr, "[ERROR]: framebuffer size callback: setting scale matrix uniform\n");
-		}
-		free(scale);
-	}
+	//set_uniform("scale_matrix", smat_f, models->frame);
+	set_uniform("scale_matrix", smat_p, models->particles);
+
+	free(smat_p);
+	//free(smat_f);
 }
 
 static void set_callbacks(GLFWwindow *window)
@@ -207,6 +290,7 @@ static void set_callbacks(GLFWwindow *window)
 	glfwSetKeyCallback(window, key_pressed_callback);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 }
+
 
 static void glfwMainLoop(GLFWwindow *window, void (*render_function)(void *arguments), void *arguments)
 {
@@ -216,138 +300,6 @@ static void glfwMainLoop(GLFWwindow *window, void (*render_function)(void *argum
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-}
-
-int create_opengl_objects(GLuint *vao, GLuint *vbo, int size, void *pointer)
-{
-	glGenVertexArrays(1, vao);
-	glBindVertexArray(*vao);
-	if (GL_NO_ERROR != glGetError()) {
-		fprintf(stderr, "[ERROR]: binding vertex array object\n");
-		return 1;
-	}
-
-	glGenBuffers(1, vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, *vbo);
-	//GL_DYNAMIC_DRAW
-	glBufferData(GL_ARRAY_BUFFER, size, pointer, GL_STREAM_DRAW);
-	if (GL_NO_ERROR != glGetError()) {
-		fprintf(stderr, "[ERROR]: binding vertex buffer object\n");
-		return 1;
-	}
-	return 0;
-}
-
-int handling_uniforms(GLuint program, float radius, int n_segments, int width, int height)
-{
-#ifdef CHECK_ERRORS
-#	error "handling_uniforms: CHECK_ERRORS previously defined"
-#elif defined INIT || defined ERROR || defined RMAT || defined COLORS || defined SCALE
-#	error "flags already defined"
-#endif
-#define CHECK_ERRORS(error, string) do { if (GL_NO_ERROR != glGetError()) { fprintf(stderr, "[ERROR]: %s\n", (string)); flags |= error; goto cleanup; } } while (0)
-#define INIT	0x0
-#define ERROR	0x1
-#define RMAT 	0x2
-#define COLORS	0x4
-#define SCALE	0x8
-	int flags = INIT;
-	
-	GLint uni_r = glGetUniformLocation(program, "radius");
-	CHECK_ERRORS(ERROR, "getting radius uniform");
-	GLint uni_n = glGetUniformLocation(program, "n_segments");
-	CHECK_ERRORS(ERROR, "getting n segments uniform");
-	GLint uni_r_mat = glGetUniformLocation(program, "rotation_matrix");
-	CHECK_ERRORS(ERROR, "getting rotation matrix uniform");
-	GLint uni_scale = glGetUniformLocation(program, "scale_matrix");
-	CHECK_ERRORS(ERROR, "getting scale matrix uniform");
-	GLint uni_colors = glGetUniformLocation(program, "colors");
-	CHECK_ERRORS(ERROR, "getting colors uniform");
-
-	glUniform1f(uni_r, radius);
-	CHECK_ERRORS(ERROR, "setting radius uniform");
-	glUniform1i(uni_n, n_segments);
-	CHECK_ERRORS(ERROR, "setting n segments uniform");
-	
-	GLfloat *rmat = create_rotation_matrix(n_segments);
-	if (!rmat) {
-		perror("create rotation matrix");
-		flags |= ERROR;
-		goto cleanup;
-	}
-	flags |= RMAT;
-	glUniformMatrix4fv(uni_r_mat, 1, GL_TRUE, rmat);
-	CHECK_ERRORS(ERROR, "setting rotation matrix uniform");
-
-	GLfloat *scale = create_scale_matrix(width, height);
-	if (!scale) {
-		perror("create scale matrix");
-		flags |= ERROR;
-		goto cleanup;
-	}
-	flags |= SCALE;
-	glUniformMatrix4fv(uni_scale, 1, GL_TRUE, scale);
-	CHECK_ERRORS(ERROR, "setting scale matrix uniform");
-
-	GLfloat *color_values = create_colors(5);
-	if (!color_values) {
-		perror("create colors");
-		flags |= ERROR;
-		goto cleanup;
-	}
-	flags |= COLORS;
-	glUniform3fv(uni_colors, 5, color_values);
-	CHECK_ERRORS(ERROR, "setting colors uniform");
-
-cleanup:
-	if (flags & COLORS) free(color_values);
-	if (flags & SCALE) free(scale);
-	if (flags & RMAT) free(rmat);
-	flags &= ERROR;
-	return flags;
-#undef INIT
-#undef ERROR
-#undef RMAT
-#undef COLORS
-#undef SCALE
-#undef CHECK_ERRORS
-}
-
-int handling_attribute_pointers(GLuint program, struct attrib_pointer_data *data)
-{
-#ifdef CHECK_ATTRIBUTE
-#	error "CHECK ATTRIBUTE already defined"
-#elif defined CHECK_ERRORS
-#	error "CHECK_ERRORS already defined"
-#endif
-#define STR(x) #x
-#define CHECK_ATTRIBUTE(attribute) do {if ((attribute) == -1) {fprintf(stderr, "[ERROR]: %s: no such attribute\n", STR(attribute)); error = 1; goto exit;}} while (0)
-#define CHECK_ERRORS(string) do {if (GL_NO_ERROR != glGetError()) {fprintf(stderr, "[ERROR]: %s\n", (string)); error = 1; goto exit;}} while (0)
-	int n = data->color_n + data->coord_n;
-	int error = 0;
-
-	GLint position_attribute = glGetAttribLocation(program, "position"); 
-	CHECK_ATTRIBUTE(position_attribute);
-	CHECK_ERRORS("getting position attribute");
-	
-	GLint color_attribute = glGetAttribLocation(program, "color");
-	CHECK_ATTRIBUTE(color_attribute);
-	CHECK_ERRORS("getting color attribute");
-	
-	glVertexAttribPointer(position_attribute, data->coord_n, GL_FLOAT, GL_FALSE, n * data->type_size, (GLvoid *) 0);
-	CHECK_ERRORS("setting position attribute pointer");
-	glVertexAttribPointer(color_attribute, data->color_n, GL_FLOAT, GL_FALSE, n * data->type_size, (GLvoid *)(data->coord_n * data->type_size)); 
-	CHECK_ERRORS("setting color attribute pointer");
-	
-	glEnableVertexAttribArray(position_attribute);
-	CHECK_ERRORS("enabling position attribute pointer");
-	glEnableVertexAttribArray(color_attribute);
-	CHECK_ERRORS("enabling color attribute pointer");
-exit:
-	return error;
-#undef STR
-#undef CHECK_ATTRIBUTE
-#undef CHECK_ERRORS
 }
 
 static GLfloat *create_rotation_matrix(int n)
@@ -369,25 +321,36 @@ static GLfloat *create_rotation_matrix(int n)
 	return rmat;
 }
 
-static GLfloat *create_scale_matrix(int width, int height)
+static GLfloat *create_scale_matrix(float factor, int width, int height)
 {
 	register GLfloat *scale = calloc(16, sizeof(*scale));
 	if (!scale) return scale;
 
 	register int k;
 	for (k = 0; k < 4; ++k) scale[4 * k + k] = 1.f;
+	scale[0] = scale[5] = factor;
 
 	if (height < width) {
-		scale[0] = (GLfloat) height / (GLfloat) width;
+		scale[0] = factor * ((GLfloat) height / (GLfloat) width);
 	} else if (width < height) {
-		scale[5] = (GLfloat) width / (GLfloat) height;
+		scale[5] = factor *((GLfloat) width / (GLfloat) height);
 	}
 
 	return scale;
 }
 
+
 void render(void *arguments)
 {
-	struct render_args *args = (struct render_args *)arguments;
-	glDrawArrays(GL_POINTS, 0, args->n_points);
+	struct models *models = (struct models *)arguments;
+	draw_model(models->particles);
+	//draw_model(models->frame);
 }
+
+
+void GLAPIENTRY gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+{
+	fprintf(stderr, "[GL]: %s type = 0x%x, severity = 0x%x, id = 0x%x%s%s\n",
+			(type == GL_DEBUG_TYPE_ERROR ? "[ERROR]: " : ""), type, severity, id, (length != 0 ? ", message = " : ""), message);
+}
+

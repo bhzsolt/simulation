@@ -12,7 +12,8 @@ test_target	:= $(target)/test
 source_dirs := $(dev) $(inc) $(test_source)
 target_dirs	:= $(bin) $(obj) $(test_target)
 
-object_files := $(addsuffix .o,$(addprefix $(obj)/,particle config timing random colors simulation))
+simulation_object_files := $(addsuffix .o,$(addprefix $(obj)/,particle config timing random colors simulation))
+plotter_object_files := $(addsuffix .o,$(addprefix $(obj)/,drawing shaders colors model))
 
 CC		:= gcc
 CFLAGS	:= -I $(inc) -Wall -Wpedantic -Wextra -std=gnu99 -O3 -fdiagnostics-color=always
@@ -23,13 +24,14 @@ GLIBS	:= $(shell pkg-config --libs glew glfw3) -lm
 
 .PHONY : echo tree target objects 
 
-.PHONY : color_test simulation drawing
+.PHONY : color_test shader_test model_test simulation drawing
 
 all : test simulation drawing
-test : color_test shader_test
+test : color_test shader_test model_test
 
 color_test : $(test_target)/color_test
 shader_test : $(test_target)/shader_test
+model_test : $(test_target)/model_test
 simulation : $(bin)/simulation
 drawing : $(bin)/drawing
 
@@ -40,8 +42,13 @@ $(test_target)/color_test : $(test_source)/color_test.c $(inc)/particle.h | $(te
 $(test_target)/shader_test : $(test_source)/shader_test.c $(inc)/shaders.h $(obj)/shaders.o | $(test_target)
 	$(CC) $(CFLAGS) $(GLIBS) $< $(obj)/shaders.o -o $@
 
-objects : $(object_files) $(obj)/drawing.o
-$(object_files) : | $(obj)
+$(test_target)/model_test : $(test_source)/model_test.c $(inc)/model.h | $(test_target)
+	$(CC) $(CFLAGS) $(GLIBS) $< -o $@
+
+
+objects : $(simulation_object_files) $(plotter_object_files)
+$(simulation_object_files) $(plotter_object_files) : | $(obj)
+
 
 $(obj)/particle.o : $(dev)/particle.c $(inc)/particle.h $(inc)/config.h $(inc)/random.h $(inc)/colors.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -58,21 +65,25 @@ $(obj)/random.o : $(dev)/random.c $(inc)/random.h
 $(obj)/simulation.o : $(dev)/simulation.c $(inc)/config.h $(inc)/particle.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(obj)/drawing.o : $(dev)/drawing.c $(inc)/shaders.h $(inc)/colors.h | $(obj)
+
+$(obj)/drawing.o : $(dev)/drawing.c $(inc)/shaders.h $(inc)/colors.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(obj)/shaders.o : $(dev)/shaders.c $(inc)/shaders.h | $(obj)
+$(obj)/shaders.o : $(dev)/shaders.c $(inc)/shaders.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(obj)/colors.o : $(dev)/colors.c $(inc)/colors.h | $(obj)
+$(obj)/colors.o : $(dev)/colors.c $(inc)/colors.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(obj)/model.o : $(dev)/model.c $(inc)/model.h $(inc)/shaders.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
-$(bin)/simulation : $(object_files) | $(bin)
-	$(CC) $(CFLAGS) $(SLIBS) $(object_files) -o $@ 
+$(bin)/simulation : $(simulation_object_files) 
+	$(CC) $(CFLAGS) $(SLIBS) $(simulation_object_files) -o $@ 
 
-$(bin)/drawing : $(obj)/drawing.o $(obj)/shaders.o $(obj)/colors.o
-	$(CC) $(CFLAGS) $(GLIBS) $< $(obj)/shaders.o $(obj)/colors.o -o $@
+$(bin)/drawing : $(plotter_object_files) 
+	$(CC) $(CFLAGS) $(GLIBS) $(plotter_object_files) -o $@
 
 
 target : | $(target_dirs)
