@@ -34,8 +34,8 @@ test : color_test shader_test model_test
 color_test : $(test_target)/color_test
 shader_test : $(test_target)/shader_test
 model_test : $(test_target)/model_test
-simulation : $(bin)/simulation
-drawing : $(bin)/drawing
+simulation : $(bin)/simulation 
+drawing : $(bin)/shaders $(bin)/drawing 
 
 
 $(test_target)/color_test : $(test_source)/color_test.c $(inc)/particle.h | $(test_target)
@@ -81,10 +81,10 @@ $(obj)/model.o : $(dev)/model.c $(inc)/model.h $(inc)/shaders.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
-$(bin)/simulation : $(simulation_object_files) 
+$(bin)/simulation : $(simulation_object_files) | $(bin)
 	$(CC) $(CFLAGS) $(SLIBS) $(simulation_object_files) -o $@ 
 
-$(bin)/drawing : $(plotter_object_files) 
+$(bin)/drawing : $(plotter_object_files) | $(bin)
 	$(CC) $(CFLAGS) $(GLIBS) $(plotter_object_files) -o $@
 
 
@@ -96,8 +96,8 @@ $(target) :
 $(target_dirs) : | $(target)
 	mkdir $@
 
-$(bin)/shaders : | $(bin)
-	ln -s $(dir)/shaders $(dir)/$(bin)/shaders
+$(bin)/shaders : $(source)/shaders | $(bin)
+	cp -r $(source)/shaders $(bin)
 
 
 clean :
