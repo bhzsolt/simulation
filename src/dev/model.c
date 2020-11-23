@@ -189,10 +189,9 @@ int set_uniform(const char *uni_name, void *data, struct model *model)
 			found = 1;
 			glUseProgram(model->shader_program);
 			if (data) {
-				gl_uniform_wrapper(model->uniforms + i, data);
-			} else {
-				gl_uniform_wrapper(model->uniforms + i, model->uniforms[i].data);
+				model.uniform[i].data = data;
 			}
+			gl_uniform_wrapper(model->uniforms + i, model->uniforms[i].data);
 		} else {
 			++i;
 		}
@@ -347,7 +346,6 @@ static int set_attribute(struct model *model, struct attribute *attribute)
 	register int flags = INIT;
 	register GLint attr_id;
 
-
 	glBindVertexArray(model->vao);
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	attr_id = glGetAttribLocation(model->shader_program, attribute->name);
@@ -374,4 +372,3 @@ exit:
 #undef CHECK_ERROR
 	}
 }
-

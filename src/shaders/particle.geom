@@ -15,8 +15,8 @@ flat out int i;
 
 void main()
 {
-	create_particle(gl_in[0].gl_Position);
 	i = a_color[0];
+	create_particle(gl_in[0].gl_Position);
 }
 
 void create_particle(vec4 origin)
@@ -32,6 +32,6 @@ void create_particle(vec4 origin)
 		p = rotation_matrix * p;
 		gl_Position = scale_matrix * (origin + p);
 		EmitVertex();
+		EndPrimitive();
 	}
-	EndPrimitive();
 }
